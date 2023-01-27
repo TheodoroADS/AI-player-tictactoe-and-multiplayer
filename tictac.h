@@ -40,11 +40,13 @@ public:
         return std::string(to_cstr(value));
     }
 
+    static inline TicTacValue oponent( TicTacValue value) {
+        return value == O ? X : O; 
+    }
+
 private:
 
     std::array<TicTacValue , N*N> tiles;
-
-
 
 public:
 
@@ -55,7 +57,6 @@ public:
 
     TicTac(TicTac&& other) = default;
     
-    TicTac& operator=(TicTac&& other) = default;
     
     TicTac(const std::array<TicTacValue, N*N>& other) {
         
@@ -66,15 +67,25 @@ public:
     }
 
     TicTac(const TicTac& other) : TicTac(other.tiles) {}
+    
+    TicTac& operator=(TicTac&& other) = default;
 
     TicTac(const TicTac&other , const u32 index , const TicTacValue value) 
-    : tiles(other.tiles)
     {
+
+        for ( u32 i = 0 ; i < N*N ; ++i) {
+            tiles[i] = other.tiles[i];
+        }   
+
         tiles[index] = value;
     }
     
     inline void setTile(TicTacValue value , u32 row, u32 col) {
         tiles[row * N + col] = value;
+    }
+
+    inline void setTile(TicTacValue value, u32 index) {
+        tiles[index] = value;
     }
 
     inline TicTacValue getTile(u32 row, u32 col) const { // readonly function
@@ -86,13 +97,13 @@ public:
     }
 
 
-    void display(u32 row_cursor , u32 col_cursor) const {
+    void display(u32 row_cursor = N, u32 col_cursor = N) const {
 
             for(u32 i = 0 ; i < N ; i++){
 
                 for(u32 j = 0; j< N ; j++){
                     
-                    if (i == row_cursor && j == col_cursor) {
+                    if (i == row_cursor && j == col_cursor && (row_cursor < N && col_cursor < N)) {
                     
                         std::cout <<  "| "  << "[" << to_cstr(getTile(i,j))<< "]" <<  " " ;
                     
@@ -111,29 +122,25 @@ public:
     }
 
 
-    // std::string toString() const{
+    bool operator==(const TicTac& other) const {
 
-
-    //     std::string res = "\n ___ ___ ___\n";
-
-    //     for(int i = 0 ; i < 3 ; i++){
+        for (u32 i = 0 ; i < N*N; i++) {
             
+            if (tiles[i] != other.tiles[i]) {
+                return false;
+            }
+        
+        }
 
-    //         for(int j = 0; j< 3 ; j++){
-                
-    //             res += "| " + to_string(getTile(i,j)) + std::string(" ");
-    //         }
-    //         res += "|\n";
-    //     } 
+        return true;
 
-    // return res;
-    
-    // }
-
-
-    inline bool operator==(const TicTac& other) const {
-        return tiles == other.tiles;
     } 
+
+    bool operator!=(const TicTac& other) const {
+        return !(*this == other);
+    }
+
+
 
     bool isComplete() const {
         
@@ -234,24 +241,34 @@ public:
     struct EmptyTilesArray {
         u32* indexes;
         u32 count;
+
     };
 
     EmptyTilesArray findNextEmptyTiles() const {
         
         u32 count = 0;
-        u32 buffer[N];
-        u32* result;
+        u32 buffer[N*N];
+        u32* result; 
 
-        for (u32 i = 0; i < N*N ; ++i) {
+        for (u32 i = 0; i < N*N ; i++) {
 
-            if (tiles[i] == EMPTY) 
-                buffer[count++] = i;
+            if (tiles[i] == EMPTY) {
+                buffer[count] = i;
+                // std::cout << "empty tiles i " << i << " count " << count <<  " buff " << buffer[count]  << std::endl;
+                count++;
+            }
         }
 
-        if (count > 0) {
-
+        if (count != 0) {
+            
             result = new u32[count];
-            memcpy(result, buffer, count * sizeof(u32));
+
+            for (u32 i = 0; i < count; i++)
+            {
+                result[i] = buffer[i];
+            }
+            
+
 
         } else {
 
@@ -282,11 +299,11 @@ public:
             nextBoards[i] = new TicTac(*this, emptyTiles.indexes[i], player);
         }
 
+
+        delete[] emptyTiles.indexes;
         return {nextBoards, emptyTiles.count};
 
     }
-
-
 
 
 };

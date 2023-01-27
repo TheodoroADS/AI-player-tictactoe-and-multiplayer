@@ -14,14 +14,14 @@ class MinMaxAgent {
         struct TicTacNode* parent;
         const TicTac* content;
         struct TicTacNode** children; // Node takes ownership of the children
-        u32 childCount;
-        unsigned int score;
+        unsigned short childCount;
+        short score;
 
         ~TicTacNode() { // Warning : recursive! 
 
             delete content;
 
-            for (u32 child_idx = 0; child_idx < childCount; child_idx++) {
+            for (unsigned short child_idx = 0; child_idx < childCount; child_idx++) {
                 delete children[child_idx];
             }
 
@@ -37,9 +37,10 @@ class MinMaxAgent {
 
         TicTacNode* node = new TicTacNode;
         node->content = current;
+        node->score = 0; // score for a draw
         TicTac::TicTacValue winner = current->winner();
 
-        if (winner != TicTac::EMPTY) { // End Game
+        if (winner != TicTac::EMPTY) { // leaf where someone won
             
             node->score = (winner == current_player) ? 1 : -1;
             node->children = nullptr;
@@ -47,27 +48,44 @@ class MinMaxAgent {
             return node;
         }   
 
-        
         TicTac::NextBoardsArray nextBoards = current->buildNextBoards(player);
 
-        if (nextBoards.count == 0) { // the board is full
+        if (nextBoards.count == 0) { // leaf where there was a tie
+
             node->children = nullptr;
             node->childCount = 0;
+            delete[] nextBoards.nextBoards;
             return node;
         }
 
         node->children = new TicTacNode*[nextBoards.count];
         node->childCount = nextBoards.count;    
-        TicTac::TicTacValue nextPlayer = player == TicTac::X ? TicTac::O : TicTac::X;
+        TicTac::TicTacValue nextPlayer = TicTac::oponent(player);
 
         for (u32 i = 0 ; i < nextBoards.count ; ++i) {
+
             TicTacNode* child = buildFrom(nextBoards.nextBoards[i], nextPlayer);
             child->parent = node;
             node->children[i] = child;
-            node->score += child->score;
+            
+            if (player == current_player) { // Max player
+
+                if (child->score > node->score) {
+                    
+                    node->score = child->score; 
+                }
+
+            } else { // Min player
+             
+                if (child->score < node->score) {
+                    
+                    node->score = child->score;
+                
+                }
+            }
         }
 
-        delete nextBoards.nextBoards;
+        delete[] nextBoards.nextBoards;
 
         return node;
 
@@ -85,12 +103,14 @@ public:
 
     MinMaxAgent() = delete;
 
+    MinMaxAgent(const MinMaxAgent& agent) = delete;
+
     explicit MinMaxAgent(const TicTac& initial , TicTac::TicTacValue player) 
     : current_player(player)
     {
         assert(player != TicTac::EMPTY);
 
-        solutionTree = buildFrom(&initial, player);
+        solutionTree = buildFrom(new TicTac(initial), TicTac::oponent(player));
         currentState = *solutionTree;
 
     }   
@@ -106,15 +126,18 @@ public:
 
     }
 
-    void inform_decision(const TicTac& updated_state) {
+    void inform_decision(u32 row, u32 col) {
+
+        const u32 index = row * N + col;
+
+        assert(currentState.content->getTile(row,col) == TicTac::EMPTY);
 
         for (u32 i = 0; i < currentState.childCount; ++i) {
 
-            if (*(currentState.children[i]->content) == updated_state) {
+            if (currentState.children[i]->content->getTile(row,col) != TicTac::EMPTY) {
 
                 currentState = *(currentState.children[i]);
                 return;
-
             }
 
         }   
@@ -125,7 +148,43 @@ public:
 
     u32 take_decision(const TicTac& current_state) { // returns the index of the tile that must be set
 
-        return 0;
+        TicTacNode selected_state;
+
+
+        if (*currentState.content != current_state) {
+            
+            std::cout << "Bosta" << std::endl;
+            currentState.content->display();
+            current_state.display();
+            assert("Still not synchronised aaaah" && false);
+
+        }
+
+        assert(*currentState.content == current_state);
+
+        TicTac::EmptyTilesArray nextEmptyIdxs =  current_state.findNextEmptyTiles();
+
+        assert(nextEmptyIdxs.count > 0);
+
+        u32 result = nextEmptyIdxs.indexes[0];
+        selected_state = *currentState.children[0];
+
+        for (unsigned short child_idx = 0; child_idx < currentState.childCount; ++child_idx) {
+
+            // currentState.children[child_idx]->content->display(0,0);    
+            // std::cout << "opa "<< currentState.children[child_idx]->score << std::endl;
+
+            if (currentState.children[child_idx]->score > selected_state.score) {
+                
+                result = nextEmptyIdxs.indexes[child_idx];
+                selected_state = *currentState.children[child_idx];
+
+            }
+        } 
+
+        delete[] nextEmptyIdxs.indexes;
+        currentState = selected_state;
+        return result;
     } 
 
 
